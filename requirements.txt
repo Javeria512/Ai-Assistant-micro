@@ -1,0 +1,25 @@
+# AI Executive Assistant - backend runtime dependencies
+# Python 3.11+ (developed and tested on 3.12)
+
+# --- web framework -----------------------------------------------------------
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30
+
+# --- Microsoft identity + Graph ---------------------------------------------
+msal>=1.31,<2.0
+httpx>=0.27,<1.0
+
+# --- configuration / validation ---------------------------------------------
+pydantic>=2.7,<3.0
+pydantic-settings>=2.3,<3.0
+python-dotenv>=1.0
+
+# --- persistence -------------------------------------------------------------
+SQLAlchemy>=2.0.30,<3.0
+greenlet>=3.0            # required by SQLAlchemy's asyncio support
+aiosqlite>=0.20          # default/dev database driver
+# asyncpg>=0.29          # uncomment for PostgreSQL (DATABASE_URL=postgresql+asyncpg://...)
+
+# --- security ----------------------------------------------------------------
+cryptography>=42.0       # Fernet encryption for the stored MSAL token cache
+PyJWT>=2.8               # application session tokens

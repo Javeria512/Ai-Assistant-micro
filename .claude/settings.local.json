@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"/c/Users/PMLS/Desktop/\" | head -50)",
+      "Bash(python -m venv .venv)",
+      "Bash(./.venv/Scripts/python.exe -m pip install --quiet --upgrade pip)",
+      "Bash(./.venv/Scripts/python.exe --version)",
+      "Bash(./.venv/Scripts/python.exe -m pip install --quiet fastapi \"uvicorn[standard]\" msal httpx \"pydantic>=2\" \"pydantic-settings>=2\" \"sqlalchemy>=2.0\" aiosqlite greenlet cryptography PyJWT python-dotenv)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(./.venv/Scripts/python.exe -m pip list)",
+      "Bash(rmdir app/auth)",
+      "Bash(python -)",
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "Bash(./.venv/Scripts/python.exe -m pytest -q)",
+      "Bash(./.venv/Scripts/python.exe -m ruff check app tests --select F,E9 --fix)",
+      "Bash(./.venv/Scripts/python.exe -m ruff check app tests --select F,E9)",
+      "Bash(./.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8011 --log-level info)",
+      "Bash(curl -s --retry 12 --retry-delay 1 --retry-all-errors http://127.0.0.1:8011/)",
+      "Bash(curl -s http://127.0.0.1:8011/health/ready)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8011/api/v1/assistant/daily-brief)",
+      "Bash(curl -s http://127.0.0.1:8011/api/v1/assistant/priorities)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\nlocation=%{redirect_url}\\\\n\" http://127.0.0.1:8011/auth/login)",
+      "Bash(xargs wc -l)",
+      "Bash(ls \"/c/Users/PMLS/.claude/projects/C--Users-PMLS-Desktop-AI-assist/memory/\" 2>/dev/null || echo \"EMPTY\")",
+      "Bash(printf '\\\\n# Local dev session cache from scripts/api_smoke.py\\\\n.dev-session.json\\\\n')",
+      "Bash(./.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8012 --log-level warning)",
+      "Bash(./.venv/Scripts/python.exe -m ruff check app tests scripts --select F,E9)"
+    ]
+  }
+}
