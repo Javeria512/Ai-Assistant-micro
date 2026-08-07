@@ -37,9 +37,11 @@ class TaskService(GraphService):
         now = utcnow()
 
         async def fetch(task_list: TaskList) -> List[TaskItem]:
+            # No `$select` — Graph 400s on `title` inside a todoTask projection.
+            # See the note above ME_TODO_TASKS in endpoints.py.
             payloads, warning = await self.client.try_get_collection(
                 endpoints.ME_TODO_TASKS.format(list_id=task_list.id),
-                params={"$select": endpoints.TODO_TASK_SELECT, "$top": 100},
+                params={"$top": 100},
                 max_items=settings.TASK_FETCH_LIMIT,
             )
             if warning:

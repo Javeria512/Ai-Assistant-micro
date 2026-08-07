@@ -495,20 +495,32 @@ def map_conversation(
         is_unread = last_read is None or ensure_aware(last_read) < last_activity
 
     topic = payload.get("topic")
+    chat_type = payload.get("chatType") or "oneOnOne"
+
+    # `$expand=members` leaves displayName and email null for participants this
+    # app is not allowed to read, and resolving them from /users/{id} needs
+    # User.ReadBasic.All, which is not in the consented scope set. Name the chat
+    # by its shape in that case — "Direct message" beats a literal "Unknown".
+    named = [person.name or person.email for person in others if person.name or person.email]
     if topic:
         display_name = topic
+    elif named:
+        display_name = ", ".join(named[:3])
+        if len(named) > 3:
+            display_name += f" +{len(named) - 3}"
     elif others:
-        names = [person.name or person.email or "Unknown" for person in others[:3]]
-        display_name = ", ".join(names)
-        if len(others) > 3:
-            display_name += f" +{len(others) - 3}"
+        display_name = (
+            "Direct message"
+            if chat_type == "oneOnOne"
+            else f"Group chat ({len(others) + 1} people)"
+        )
     else:
         display_name = "Chat"
 
     return Conversation(
         id=payload.get("id", ""),
         topic=topic,
-        chat_type=payload.get("chatType") or "oneOnOne",
+        chat_type=chat_type,
         web_url=payload.get("webUrl"),
         created_at=parse_graph_datetime(payload.get("createdDateTime")),
         last_activity_at=last_activity,

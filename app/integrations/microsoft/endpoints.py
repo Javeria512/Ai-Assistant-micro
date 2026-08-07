@@ -125,22 +125,13 @@ CHAT_MESSAGE_SELECT = ",".join(
 ME_TODO_LISTS = "/me/todo/lists"
 ME_TODO_TASKS = "/me/todo/lists/{list_id}/tasks"
 
-TODO_TASK_SELECT = ",".join(
-    [
-        "id",
-        "title",
-        "status",
-        "importance",
-        "createdDateTime",
-        "lastModifiedDateTime",
-        "dueDateTime",
-        "reminderDateTime",
-        "completedDateTime",
-        "isReminderOn",
-        "categories",
-        "body",
-    ]
-)
+# Deliberately no TODO_TASK_SELECT: Graph rejects `title` inside `$select` on
+# todoTask with `invalidRequest` (400), and `title` is the one field the task
+# list cannot be rendered without. Verified field-by-field against a live
+# tenant — every other field in the old projection was accepted; only `title`
+# failed, which took the whole request down with it. The default representation
+# already returns everything `map_todo_task` reads, so the projection bought
+# nothing. Do not reintroduce `$select` here without re-testing `title`.
 
 # Planner (requires Tasks.Read/ReadWrite; plan/bucket lookups also need Group.Read.All)
 ME_PLANNER_TASKS = "/me/planner/tasks"

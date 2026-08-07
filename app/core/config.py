@@ -130,12 +130,20 @@ class Settings(BaseSettings):
     VIP_CONTACTS: str = ""
 
     # -------------------------------------------------------------------- AI
-    # "none" keeps the deterministic rule-based output. Set to "openai" (and
-    # provide a key) to enable LLM summaries/reranking without code changes.
+    # "none" keeps the deterministic rule-based output. Set to "anthropic" or
+    # "openai" (and provide the matching key) to enable LLM summaries and
+    # reranking without code changes.
     LLM_PROVIDER: str = "none"
-    LLM_MODEL: str = "gpt-4o-mini"
+    # Left empty so each provider can supply its own default; read
+    # `llm_model` rather than this field.
+    LLM_MODEL: str = ""
     LLM_TIMEOUT_SECONDS: float = 45.0
     LLM_MAX_OUTPUT_TOKENS: int = 900
+    # Thinking depth / token spend for Claude: low | medium | high | xhigh | max.
+    # The brief and the reranker are short, latency-sensitive calls, and Claude
+    # models are strong at "low" — raise this if the narrative needs more depth.
+    LLM_EFFORT: str = "low"
+    ANTHROPIC_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
 
@@ -166,6 +174,16 @@ class Settings(BaseSettings):
     @property
     def vip_contacts(self) -> List[str]:
         return [item.lower() for item in _split_csv(self.VIP_CONTACTS)]
+
+    @property
+    def llm_model(self) -> str:
+        """Configured model, or the active provider's default when unset."""
+        if self.LLM_MODEL:
+            return self.LLM_MODEL
+        provider = (self.LLM_PROVIDER or "none").lower()
+        if provider.startswith("anthropic") or provider == "claude":
+            return "claude-opus-5"
+        return "gpt-4o-mini"
 
     @property
     def callback_path(self) -> str:

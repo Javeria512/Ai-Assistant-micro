@@ -46,7 +46,7 @@ class OpenAIProvider:
             return None
 
         payload: Dict[str, Any] = {
-            "model": self._settings.LLM_MODEL,
+            "model": self._settings.llm_model,
             "messages": [dict(message) for message in messages],
             "temperature": temperature,
             "max_tokens": max_tokens or self._settings.LLM_MAX_OUTPUT_TOKENS,

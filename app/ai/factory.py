@@ -8,6 +8,7 @@ from typing import Optional
 import httpx
 
 from app.ai.base import LLMProvider
+from app.ai.providers.anthropic_provider import AnthropicProvider
 from app.ai.providers.null_provider import NullLLMProvider
 from app.ai.providers.openai_provider import OpenAIProvider
 from app.core.config import Settings, get_settings
@@ -15,6 +16,11 @@ from app.core.config import Settings, get_settings
 logger = logging.getLogger(__name__)
 
 _NULL_PROVIDER = NullLLMProvider()
+
+#: The Anthropic SDK owns a connection pool, so the provider is built once and
+#: reused instead of per request (the OpenAI provider is cheap to construct
+#: because it borrows the app's shared httpx client).
+_ANTHROPIC_PROVIDER: Optional[AnthropicProvider] = None
 
 
 def get_llm_provider(
@@ -28,6 +34,17 @@ def get_llm_provider(
 
     if provider_name in {"", "none", "off", "disabled"}:
         return _NULL_PROVIDER
+
+    if provider_name in {"anthropic", "claude"}:
+        global _ANTHROPIC_PROVIDER
+        if _ANTHROPIC_PROVIDER is None:
+            _ANTHROPIC_PROVIDER = AnthropicProvider(settings=settings)
+        if not _ANTHROPIC_PROVIDER.available:
+            logger.warning(
+                "LLM_PROVIDER=%s but ANTHROPIC_API_KEY is missing.", provider_name
+            )
+            return _NULL_PROVIDER
+        return _ANTHROPIC_PROVIDER
 
     if provider_name in {"openai", "azure-openai", "openai-compatible"}:
         if http_client is None:
