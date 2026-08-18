@@ -110,25 +110,68 @@ decrements Home's "pending" count. Undo restores it.
 
 ## Layout
 
+Layered, with dependencies pointing one way: screens → components → theme, and
+screens → store → services → api → models. Every folder has an `index.ts`, so
+imports name the folder rather than reaching into a file.
+
 ```
-App.tsx                     fonts, providers, navigation container
+index.js                     AppRegistry entrypoint
 src/
-  api/       config.ts       resolves the backend base URL (adb reverse / LAN)
-             client.ts       fetch wrapper: bearer auth, one refresh per 401
-             types.ts        mirrors the backend's OpenAPI schemas
-  auth/      session.ts      OAuth via in-app browser, tokens in SecureStore
-  theme/     tokens.ts       LIGHT / DARK palettes, radii, font families
-             shadows.ts      the design's shadow stacks as boxShadow arrays
-             ThemeProvider   useTheme() -> { dark, c, s }
-  data/      adapters.ts     backend DTOs -> the shapes the screens render
-             content.ts      static UI copy only
-  store/     AppStore.tsx    auth + data loading + local UI state
-  components/                Icon (all SVG paths), Header, TabBar, Sheet,
-                             Toast, FilterRow, ScreenState, animations
-  screens/                   one file per screen
-  overlays/                  AlertsSheet, DetailSheet
+  App.tsx                    providers, navigation container, global overlays
+
+  api/         config.ts     resolves the backend base URL (adb reverse / LAN)
+               client.ts     transport: bearer auth, one refresh per 401, qs()
+               endpoints.ts  every route the backend exposes, grouped by router
+  models/      api.ts        mirrors the backend's OpenAPI schemas
+               view.ts       the shapes the screens actually render
+  services/    auth.ts       OAuth via in-app browser, tokens in the keychain
+               viewModel.ts  backend DTOs -> view models (one call per brief)
+  store/       reducer.ts    every state transition, pure
+               AppStore.tsx  the effects around it; exposes useApp()
+               types.ts      State / Action / Store
+
+  theme/       responsive.ts device metrics and the ms()/fs() scale functions
+               palette.ts    LIGHT / DARK colour tokens
+               typography.ts FONT faces + the TYPE scale
+               spacing.ts    SPACING, RADIUS, and fixed chrome sizes
+               shadows.ts    the design's shadow stacks as boxShadow arrays
+               ThemeProvider useTheme() -> { dark, c, s }
+  hooks/       useResponsive live layout metrics: gutters, columns, orientation
+               useAutoScroll pins a scroll view to its end as content arrives
+
+  components/  ui/           primitives: Txt, Touch, Card, Button, Icon, Chip…
+               layout/       Screen, Header, TabBar, FilterRow, Section
+               feedback/     ScreenState, EmptyState, Toast
+               sheets/       Sheet shell + AlertsSheet, DetailSheet
+               animations/   the design's four keyframe ports
+  screens/     <name>/       one folder per screen, with the parts only it uses
   navigation/                stack (auth gate) + bottom tabs
+  constants/                 static copy and behavioural constants
+  utils/       format.ts     time, date, initials, plurals
 ```
+
+Tests live in `__tests__/` beside the code they cover, which also keeps them out
+of the bundle (Metro's `blockList` excludes those directories).
+
+## Responsiveness
+
+Two scales, split by what they must survive:
+
+- **Static** (`theme/`) — type and spacing derive from the device's *shorter*
+  edge, which does not change on rotation, so `StyleSheet.create` stays cheap and
+  a heading does not resize when you turn the phone. `ms()` moderates the drift
+  and clamps it to ±30% of the design value; `fs()` does the same for type.
+- **Live** (`useResponsive`) — window-driven, for the things that genuinely
+  re-flow: page gutters, the glance grid's column count, how tall a bottom sheet
+  may grow, and whether the content column is capped and centred.
+
+Past ~640pt the reading column stops growing, so tablets and landscape phones get
+a centred column rather than cards smeared edge to edge. Landscape also lays the
+tab bar out horizontally, tightens the app bar, and puts the login hero beside its
+card instead of above it. Horizontal safe-area insets are honoured, so nothing
+lands under a notch when the device is on its side. System text scaling is
+respected up to 1.3× (`MAX_FONT_SCALE`), above which the fixed-height pills and
+rows in the design would overflow.
 
 ## How the data flows
 
@@ -140,10 +183,10 @@ Sign-in is a backend-owned OAuth flow — the app never sees the client secret:
    which reaches the backend through `adb reverse`.
 4. The backend redeems the code and 303s to `aiassistant://auth#access_token=…`.
    Tokens ride in the URL *fragment*, so they never hit a server or access log.
-5. The app reads them off the deep link and stores them in SecureStore.
+5. The app reads them off the deep link and stores them in the keychain.
 
 After that, one call — `GET /api/v1/assistant/daily-brief` — supplies every
-screen. `adapters.ts` reshapes it; a 401 triggers a single `POST /auth/refresh`
+screen. `services/viewModel.ts` reshapes it; a 401 triggers a single `POST /auth/refresh`
 and retry before the session is dropped.
 
 ## Where the design outruns the backend

@@ -69,7 +69,11 @@ def configure_logging(level: str = "INFO", json_output: bool = False) -> None:
             "loggers": {
                 "uvicorn": {"handlers": ["console"], "level": level.upper(), "propagate": False},
                 "uvicorn.access": {"handlers": ["console"], "level": "WARNING", "propagate": False},
-                "uvicorn.error": {"handlers": ["console"], "level": level.upper(), "propagate": False},
+                "uvicorn.error": {
+                    "handlers": ["console"],
+                    "level": level.upper(),
+                    "propagate": False,
+                },
                 "httpx": {"level": "WARNING"},
                 "httpcore": {"level": "WARNING"},
                 "msal": {"level": "WARNING"},

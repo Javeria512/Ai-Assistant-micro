@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.integrations.microsoft import endpoints
 from app.integrations.microsoft.mappers import map_event
 from app.schemas.calendar import CalendarEvent, DailyAgenda, MeetingConflict
+from app.services.base import GraphService
 from app.utils.datetime_utils import (
     day_bounds,
     ensure_aware,
@@ -18,7 +19,6 @@ from app.utils.datetime_utils import (
     to_graph_filter_datetime,
     utcnow,
 )
-from app.services.base import GraphService
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -141,7 +141,9 @@ class CalendarService(GraphService):
         start = start or now
 
         timed = [event for event in events if event.start and event.end]
-        total_minutes = sum(event.duration_minutes or 0.0 for event in timed if not event.is_all_day)
+        total_minutes = sum(
+            event.duration_minutes or 0.0 for event in timed if not event.is_all_day
+        )
         upcoming = [event for event in timed if event.end and event.end > now]
 
         agenda_date = local_date(start or now, timezone_name) or now.date()

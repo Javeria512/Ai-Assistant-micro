@@ -1,5 +1,3 @@
-import type { BoxShadowValue, ViewStyle } from 'react-native';
-
 /**
  * The design's shadows, ported as-authored.
  *
@@ -11,6 +9,8 @@ import type { BoxShadowValue, ViewStyle } from 'react-native';
  * Shadows read as grime on dark surfaces, so `dark` trades the wide neutral
  * spreads for tighter black ones and lets surface colour carry elevation.
  */
+
+import type { BoxShadowValue, ViewStyle } from 'react-native';
 
 type Shadow = Pick<ViewStyle, 'boxShadow'>;
 
@@ -64,10 +64,10 @@ export const shadows = (dark: boolean) => ({
  * own colour, the way the design specifies per-tile shadow colours.
  */
 function withAlpha(hex: string, alpha: number): string {
-  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   if (!m) return N(alpha);
-  const n = parseInt(m[1], 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+  const [r, g, b] = m.slice(1).map((pair) => parseInt(pair, 16));
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 export type Shadows = ReturnType<typeof shadows>;

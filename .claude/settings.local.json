@@ -24,7 +24,12 @@
       "Bash(ls \"/c/Users/PMLS/.claude/projects/C--Users-PMLS-Desktop-AI-assist/memory/\" 2>/dev/null || echo \"EMPTY\")",
       "Bash(printf '\\\\n# Local dev session cache from scripts/api_smoke.py\\\\n.dev-session.json\\\\n')",
       "Bash(./.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8012 --log-level warning)",
-      "Bash(./.venv/Scripts/python.exe -m ruff check app tests scripts --select F,E9)"
+      "Bash(./.venv/Scripts/python.exe -m ruff check app tests scripts --select F,E9)",
+      "Bash(grep -n \"require\\('\\\\.\\\\./\\\\|doMock\" src/api/__tests__/*.ts src/services/__tests__/*.ts)",
+      "Bash(sed -i \"s#from '../src/api/client'#from '..'#\" src/api/__tests__/endpoints.test.ts)",
+      "Bash(sed -i \"s#from '../src/auth/session'#from '../auth'#; s#from '../src/api/client'#from '../../api'#\" src/services/__tests__/auth.test.ts)",
+      "Bash(sed -i \"s#from '../src/data/adapters'#from '../viewModel'#; s#from '../src/api/types'#from '../../models/api'#\" src/services/__tests__/viewModel.test.ts)",
+      "Bash(sed -i \"s#import\\('../src/api/config'\\)#import\\('../config'\\)#; s#require\\('../src/api/config'\\)#require\\('../config'\\)#\" src/api/__tests__/config.test.ts)"
     ]
   }
 }

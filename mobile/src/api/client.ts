@@ -1,29 +1,12 @@
+/**
+ * HTTP transport for the FastAPI backend: error shape, auth-token plumbing,
+ * one-shot refresh-and-retry, and query-string building.
+ *
+ * The routes themselves live in `endpoints.ts`; nothing here knows what a
+ * "daily brief" is.
+ */
+
 import { API_BASE_URL } from './config';
-import type {
-  CalendarEvent,
-  ChatMessage,
-  Collection,
-  Conversation,
-  DailyBrief,
-  EmailMessage,
-  HealthStatus,
-  LoginUrlResponse,
-  MailboxPreferences,
-  MessageResponse,
-  PriorityList,
-  PriorityWeightsView,
-  SessionInfo,
-  SourceType,
-  TaskItem,
-  TaskList,
-  TaskSource,
-  TaskSummary,
-  TokenResponse,
-  UserPreferences,
-  UserPreferencesUpdate,
-  UserProfile,
-  UserSummary,
-} from './types';
 
 export class ApiError extends Error {
   constructor(
@@ -44,6 +27,7 @@ export type TokenSource = {
 };
 
 let tokens: TokenSource | null = null;
+
 export function attachTokenSource(source: TokenSource) {
   tokens = source;
 }
@@ -58,6 +42,7 @@ async function parseBody(res: Response): Promise<unknown> {
   }
 }
 
+/** Turns whatever the backend returned into a sentence worth showing a user. */
 function describe(status: number, body: unknown): string {
   if (body && typeof body === 'object' && 'detail' in body) {
     const d = (body as { detail: unknown }).detail;
@@ -83,7 +68,11 @@ async function send(path: string, init: RequestInit, token: string | null) {
  * Performs a request, and on a 401 makes exactly one attempt to rotate the
  * session before retrying. A second 401 means the session is genuinely gone.
  */
-async function raw(path: string, init: RequestInit = {}, auth = true): Promise<Response> {
+export async function raw(
+  path: string,
+  init: RequestInit = {},
+  auth = true,
+): Promise<Response> {
   let res: Response;
   try {
     res = await send(path, init, auth ? (tokens?.getAccessToken() ?? null) : null);
@@ -109,15 +98,22 @@ async function raw(path: string, init: RequestInit = {}, auth = true): Promise<R
   return res;
 }
 
-async function request<T>(path: string, init: RequestInit = {}, auth = true): Promise<T> {
+export async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  auth = true,
+): Promise<T> {
   const res = await raw(path, init, auth);
   const body = await parseBody(res);
   if (!res.ok) throw new ApiError(describe(res.status, body), res.status, body);
   return body as T;
 }
 
+/** Reads a response body for error reporting outside `request`. */
+export { describe as describeError, parseBody };
+
 /** Builds `?a=1&b=2`, dropping undefined/null and repeating array params. */
-function qs(params: Record<string, unknown>): string {
+export function qs(params: Record<string, unknown>): string {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
@@ -128,178 +124,3 @@ function qs(params: Record<string, unknown>): string {
   }
   return parts.length ? `?${parts.join('&')}` : '';
 }
-
-/**
- * Every endpoint the FastAPI backend exposes, grouped the way the routers are.
- * The dashboard only needs `assistant.dailyBrief` (which fans out server-side),
- * but the per-source readers are here so any screen can drill in without
- * reaching around the client.
- */
-export const api = {
-  /* ── health ────────────────────────────────────────────────────── */
-
-  health: () => request<HealthStatus>('/health', {}, false),
-
-  ready: () => request<HealthStatus>('/health/ready', {}, false),
-
-  /* ── auth ──────────────────────────────────────────────────────── */
-
-  /** Builds the Microsoft authorization URL for the given deep link. */
-  loginUrl: (redirectUri: string) =>
-    request<LoginUrlResponse>(
-      `/auth/login${qs({ response: 'json', redirect_uri: redirectUri })}`,
-      {},
-      false,
-    ),
-
-  refresh: (refreshToken: string) =>
-    request<TokenResponse>(
-      '/auth/refresh',
-      { method: 'POST', body: JSON.stringify({ refresh_token: refreshToken }) },
-      false,
-    ),
-
-  logout: (refreshToken?: string) =>
-    request<MessageResponse>('/auth/logout', {
-      method: 'POST',
-      body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {}),
-    }),
-
-  session: () => request<SessionInfo>('/auth/session'),
-
-  /* ── user ──────────────────────────────────────────────────────── */
-
-  me: () => request<UserProfile>('/api/v1/users/me'),
-
-  /**
-   * The photo endpoint answers 204 when the account has none, so this resolves
-   * to null rather than throwing. Returns a data URI ready for `<Image>`.
-   */
-  myPhoto: async (): Promise<string | null> => {
-    const res = await raw('/api/v1/users/me/photo');
-    if (res.status === 204) return null;
-    if (!res.ok) throw new ApiError(describe(res.status, await parseBody(res)), res.status);
-
-    const blob = await res.blob();
-    return new Promise<string | null>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new ApiError('Could not read the photo.', 0));
-      reader.onloadend = () =>
-        resolve(typeof reader.result === 'string' ? reader.result : null);
-      reader.readAsDataURL(blob);
-    });
-  },
-
-  mailboxSettings: () => request<MailboxPreferences>('/api/v1/users/me/mailbox'),
-
-  preferences: () => request<UserPreferences>('/api/v1/users/me/preferences'),
-
-  updatePreferences: (payload: UserPreferencesUpdate) =>
-    request<UserPreferences>('/api/v1/users/me/preferences', {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    }),
-
-  /* ── mail ──────────────────────────────────────────────────────── */
-
-  mail: {
-    messages: (opts: {
-      limit?: number;
-      folder?: string;
-      unreadOnly?: boolean;
-      search?: string;
-    } = {}) =>
-      request<Collection<EmailMessage>>(
-        `/api/v1/mail/messages${qs({
-          limit: opts.limit,
-          folder: opts.folder,
-          unread_only: opts.unreadOnly,
-          search: opts.search,
-        })}`,
-      ),
-
-    important: (limit?: number) =>
-      request<Collection<EmailMessage>>(`/api/v1/mail/important${qs({ limit })}`),
-
-    message: (messageId: string) =>
-      request<EmailMessage>(`/api/v1/mail/messages/${encodeURIComponent(messageId)}`),
-  },
-
-  /* ── calendar ──────────────────────────────────────────────────── */
-
-  calendar: {
-    today: () => request<Collection<CalendarEvent>>('/api/v1/calendar/today'),
-
-    events: (opts: {
-      start?: string;
-      end?: string;
-      limit?: number;
-      includeDeclined?: boolean;
-    } = {}) =>
-      request<Collection<CalendarEvent>>(
-        `/api/v1/calendar/events${qs({
-          start: opts.start,
-          end: opts.end,
-          limit: opts.limit,
-          include_declined: opts.includeDeclined,
-        })}`,
-      ),
-
-    conflicts: (days?: number) =>
-      request<Collection<CalendarEvent>>(`/api/v1/calendar/conflicts${qs({ days })}`),
-  },
-
-  /* ── chats (Teams) ─────────────────────────────────────────────── */
-
-  chats: {
-    list: (limit?: number) =>
-      request<Collection<Conversation>>(`/api/v1/chats${qs({ limit })}`),
-
-    important: (limit?: number) =>
-      request<Collection<Conversation>>(`/api/v1/chats/important${qs({ limit })}`),
-
-    messages: (chatId: string, limit?: number) =>
-      request<Collection<ChatMessage>>(
-        `/api/v1/chats/${encodeURIComponent(chatId)}/messages${qs({ limit })}`,
-      ),
-  },
-
-  /* ── tasks ─────────────────────────────────────────────────────── */
-
-  tasks: {
-    pending: (limit?: number) =>
-      request<Collection<TaskItem>>(`/api/v1/tasks/pending${qs({ limit })}`),
-
-    list: (opts: { includeCompleted?: boolean; sources?: TaskSource[] } = {}) =>
-      request<Collection<TaskItem>>(
-        `/api/v1/tasks${qs({
-          include_completed: opts.includeCompleted,
-          sources: opts.sources,
-        })}`,
-      ),
-
-    lists: () => request<Collection<TaskList>>('/api/v1/tasks/lists'),
-
-    summary: () => request<TaskSummary>('/api/v1/tasks/summary'),
-  },
-
-  /* ── assistant ─────────────────────────────────────────────────── */
-
-  priorities: (opts: { limit?: number; sources?: SourceType[]; useAi?: boolean } = {}) =>
-    request<PriorityList>(
-      `/api/v1/assistant/priorities${qs({
-        limit: opts.limit,
-        sources: opts.sources,
-        use_ai: opts.useAi,
-      })}`,
-    ),
-
-  dailyBrief: (useAi = true) =>
-    request<DailyBrief>(`/api/v1/assistant/daily-brief${qs({ use_ai: useAi })}`),
-
-  summary: (useAi = true) =>
-    request<UserSummary>(`/api/v1/assistant/summary${qs({ use_ai: useAi })}`),
-
-  priorityWeights: () =>
-    request<PriorityWeightsView>('/api/v1/assistant/priority-weights'),
-};

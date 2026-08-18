@@ -1,3 +1,12 @@
+/**
+ * The single app store: session, the loaded daily brief, and the local UI state
+ * layered over it (checked-off tasks, dismissed messages, the chat thread).
+ *
+ * State transitions live in `reducer.ts`; this file owns the effects — restoring
+ * the keychain session, wiring the API client's token source, loading the brief,
+ * and the toast timer.
+ */
+
 import React, {
   createContext,
   useCallback,
@@ -7,190 +16,26 @@ import React, {
   useReducer,
   useRef,
 } from 'react';
-import { api, ApiError, attachTokenSource } from '../api/client';
-import type { SessionInfo } from '../api/types';
+import { ApiError, api, attachTokenSource } from '../api';
+import { TOAST_MS } from '../constants/app';
+import type { SessionInfo } from '../models/api';
 import {
   AuthCancelled,
+  buildViewModel,
   clearSession,
   loadSession,
   saveSession,
   signInWithMicrosoft,
-  StoredSession,
   toSession,
-} from '../auth/session';
-import { buildViewModel, ViewModel } from '../data/adapters';
-import { TOAST_MS } from '../data/content';
-
-export type ChatMessage = { role: 'user' | 'ai'; text: string; source?: string };
-
-/** `key` indexes into `vm.sheets`. */
-export type Overlay = { kind: 'alerts' } | { kind: 'detail'; key: string } | null;
-
-export type AuthState = 'restoring' | 'signedOut' | 'signedIn';
-
-type State = {
-  dark: boolean;
-  auth: AuthState;
-  session: StoredSession | null;
-  signingIn: boolean;
-  authError: string | null;
-
-  vm: ViewModel | null;
-  loading: boolean;
-  error: string | null;
-
-  // Local, per-session UI state layered over server data.
-  done: Record<string, boolean>;
-  gone: Record<string, boolean>;
-  lastGone: string | null;
-  chat: ChatMessage[];
-  typing: boolean;
-  input: string;
-  toast: string | null;
-  overlay: Overlay;
-};
-
-const initial: State = {
-  dark: false,
-  auth: 'restoring',
-  session: null,
-  signingIn: false,
-  authError: null,
-  vm: null,
-  loading: false,
-  error: null,
-  done: {},
-  gone: {},
-  lastGone: null,
-  chat: [],
-  typing: false,
-  input: '',
-  toast: null,
-  overlay: null,
-};
-
-type Action =
-  | { type: 'toggleDark' }
-  | { type: 'restored'; session: StoredSession | null }
-  | { type: 'signingIn' }
-  | { type: 'signedIn'; session: StoredSession }
-  | { type: 'authError'; message: string | null }
-  | { type: 'signedOut' }
-  | { type: 'loading' }
-  | { type: 'loaded'; vm: ViewModel }
-  | { type: 'loadError'; message: string }
-  | { type: 'toggleTask'; id: string }
-  | { type: 'setInput'; value: string }
-  | { type: 'askStart'; text: string }
-  | { type: 'askEnd'; text: string; source?: string }
-  | { type: 'remove'; id: string; toast: string }
-  | { type: 'undo' }
-  | { type: 'openOverlay'; overlay: Overlay }
-  | { type: 'closeOverlay' }
-  | { type: 'toast'; text: string | null };
-
-function reducer(s: State, a: Action): State {
-  switch (a.type) {
-    case 'toggleDark':
-      return { ...s, dark: !s.dark };
-
-    case 'restored':
-      return a.session
-        ? { ...s, auth: 'signedIn', session: a.session }
-        : { ...s, auth: 'signedOut', session: null };
-
-    case 'signingIn':
-      return { ...s, signingIn: true, authError: null };
-
-    case 'signedIn':
-      return { ...s, auth: 'signedIn', session: a.session, signingIn: false, authError: null };
-
-    case 'authError':
-      return { ...s, signingIn: false, authError: a.message };
-
-    // Signing out clears everything but the chosen appearance.
-    case 'signedOut':
-      return { ...initial, dark: s.dark, auth: 'signedOut' };
-
-    case 'loading':
-      return { ...s, loading: true, error: null };
-
-    case 'loaded':
-      return { ...s, loading: false, error: null, vm: a.vm };
-
-    case 'loadError':
-      return { ...s, loading: false, error: a.message };
-
-    case 'toggleTask':
-      return { ...s, done: { ...s.done, [a.id]: !s.done[a.id] } };
-
-    case 'setInput':
-      return { ...s, input: a.value };
-
-    case 'askStart':
-      return { ...s, chat: [...s.chat, { role: 'user', text: a.text }], input: '', typing: true };
-
-    case 'askEnd':
-      return {
-        ...s,
-        typing: false,
-        chat: [...s.chat, { role: 'ai', text: a.text, source: a.source }],
-      };
-
-    case 'remove':
-      return {
-        ...s,
-        gone: { ...s.gone, [a.id]: true },
-        lastGone: a.id,
-        overlay: null,
-        toast: a.toast,
-      };
-
-    case 'undo':
-      if (!s.lastGone) return s;
-      return {
-        ...s,
-        gone: { ...s.gone, [s.lastGone]: false },
-        lastGone: null,
-        toast: null,
-      };
-
-    case 'openOverlay':
-      return { ...s, overlay: a.overlay };
-
-    case 'closeOverlay':
-      return { ...s, overlay: null };
-
-    case 'toast':
-      return { ...s, toast: a.text };
-  }
-}
-
-type Store = State & {
-  msgCount: number;
-  tasksLeft: number;
-  /** 0–100 per task id; a local check-off pins it to 100. */
-  pct: Record<string, number>;
-  toggleDark: () => void;
-  signIn: () => void;
-  signOut: () => void;
-  refresh: () => void;
-  toggleTask: (id: string) => void;
-  setInput: (value: string) => void;
-  ask: (text: string) => void;
-  reply: (id: string) => void;
-  snooze: (id: string) => void;
-  undo: () => void;
-  openAlerts: () => void;
-  openDetail: (key: string) => void;
-  closeOverlay: () => void;
-  confirmSheet: () => void;
-};
+  type StoredSession,
+} from '../services';
+import { initialState, reducer } from './reducer';
+import type { Store } from './types';
 
 const AppContext = createContext<Store | null>(null);
 
 export function AppStoreProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initial);
+  const [state, dispatch] = useReducer(reducer, initialState);
 
   // The client reads tokens through a ref so a refresh mid-flight always sees
   // the newest pair without re-registering the token source.
@@ -215,7 +60,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         }
       },
       onUnauthorized: () => {
-        void clearSession();
+        clearSession();
         dispatch({ type: 'signedOut' });
       },
     });
@@ -224,7 +69,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   // Restore a stored session on cold start.
   useEffect(() => {
     let alive = true;
-    void (async () => {
+    (async () => {
       const stored = await loadSession();
       if (alive) dispatch({ type: 'restored', session: stored });
     })();
@@ -260,7 +105,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (state.auth === 'signedIn' && !state.vm && !state.loading && !state.error) {
-      void load();
+      load();
     }
   }, [state.auth, state.vm, state.loading, state.error, load]);
 
@@ -305,30 +150,29 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     if (!text) return;
     dispatch({ type: 'askStart', text });
     try {
-      const s = await api.summary();
-      const body =
-        s.narrative ??
-        [s.headline, ...s.highlights].filter(Boolean).join('\n• ') ??
-        'Nothing stands out right now.';
+      const summary = await api.summary();
+      const bullets = [summary.headline, ...summary.highlights].filter(Boolean);
       dispatch({
         type: 'askEnd',
-        text: body,
-        source: s.ai_generated
+        text:
+          summary.narrative ||
+          (bullets.length ? bullets.join('\n• ') : 'Nothing stands out right now.'),
+        source: summary.ai_generated
           ? 'Generated from your Microsoft 365 data'
           : 'From your Microsoft 365 data',
       });
     } catch (e) {
       dispatch({
         type: 'askEnd',
-        text: e instanceof ApiError ? e.message : 'I could not reach the assistant service.',
+        text:
+          e instanceof ApiError ? e.message : 'I could not reach the assistant service.',
       });
     }
   }, []);
 
-  const value = useMemo<Store>(() => {
+  const store = useMemo<Store>(() => {
     const messages = state.vm?.messages ?? [];
     const tasks = state.vm?.tasks ?? [];
-    const msgCount = messages.filter((m) => !state.gone[m.id]).length;
     const doneCount = tasks.filter((t) => state.done[t.id]).length;
 
     const pct: Record<string, number> = {};
@@ -339,16 +183,24 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
     return {
       ...state,
-      msgCount,
+      msgCount: messages.filter((m) => !state.gone[m.id]).length,
       tasksLeft: Math.max(0, (state.vm?.glance.tasks ?? 0) - doneCount),
       pct,
       toggleDark: () => dispatch({ type: 'toggleDark' }),
-      signIn: () => void signIn(),
-      signOut: () => void signOut(),
-      refresh: () => void load(),
+      signIn: () => {
+        signIn();
+      },
+      signOut: () => {
+        signOut();
+      },
+      refresh: () => {
+        load();
+      },
       toggleTask: (id) => dispatch({ type: 'toggleTask', id }),
-      setInput: (value) => dispatch({ type: 'setInput', value }),
-      ask: (t) => void ask(t),
+      setInput: (next) => dispatch({ type: 'setInput', value: next }),
+      ask: (text) => {
+        ask(text);
+      },
       reply: (id) => dispatch({ type: 'remove', id, toast: `Replied to ${nameFor(id)}` }),
       snooze: (id) => dispatch({ type: 'remove', id, toast: 'Snoozed for 1 hour' }),
       undo: () => dispatch({ type: 'undo' }),
@@ -368,7 +220,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     };
   }, [state, signIn, signOut, load, ask]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={store}>{children}</AppContext.Provider>;
 }
 
 export function useApp(): Store {

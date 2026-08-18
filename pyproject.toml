@@ -1,0 +1,65 @@
+[project]
+name = "ai-executive-assistant"
+version = "2.4.0"
+description = "Backend for the AI Executive Personal Assistant: Microsoft 365 sign-in, Graph readers, and one explainable ranked worklist."
+readme = "README.md"
+requires-python = ">=3.11"
+
+# Runtime and dev dependencies are pinned in requirements.txt and
+# requirements-dev.txt, which is what the Dockerfile and CI install from. They
+# are not duplicated here — one source of truth.
+
+[tool.ruff]
+# The codebase already reads comfortably at this width; 88 would rewrap ~150
+# lines for no gain.
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", "venv", "mobile", "docs/reference_original"]
+
+[tool.ruff.lint]
+# Rules that find real defects and enforce a consistent import order, without
+# rewriting working code for style.
+#
+# `UP` (pyupgrade) is deliberately left out. It would rewrite ~730 typing
+# annotations — `Optional[X]` → `X | None`, `List[X]` → `list[X]` — which is a
+# worthwhile modernisation on this Python floor but belongs in its own commit,
+# not buried in a structural refactor. To do it:
+#     ruff check --select UP --fix . && pytest
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes: undefined names, unused imports
+    "I",   # import ordering
+    "B",   # bugbear: likely bugs and design problems
+]
+ignore = [
+    # `Depends(...)` in a signature default is the FastAPI idiom, not a bug.
+    "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Re-exports are the point of a package __init__.
+"__init__.py" = ["F401"]
+# Tests may shadow builtins in fixtures and assert on long literals.
+"tests/**" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/main.py"]
+
+[tool.coverage.report]
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

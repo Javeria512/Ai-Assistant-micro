@@ -1,5 +1,6 @@
 import { NativeModules } from 'react-native';
 import { API_URL } from '@env';
+import { AUTH_REDIRECT } from '../constants/app';
 
 /**
  * Where the FastAPI backend lives.
@@ -14,6 +15,9 @@ import { API_URL } from '@env';
  * first and falls back to the shell. Both are resolved when the bundle is
  * built, so a change needs a Metro restart with `--reset-cache`.
  */
+
+/** Port the backend listens on when nothing overrides `API_URL`. */
+const DEFAULT_PORT = 8000;
 
 /**
  * Host that served the JS bundle. This is the React Native CLI equivalent of
@@ -43,12 +47,12 @@ function inferBaseUrl(): string {
 
   const host = bundleHost();
   if (host && host !== 'localhost' && host !== '127.0.0.1') {
-    return `http://${host}:8000`;
+    return `http://${host}:${DEFAULT_PORT}`;
   }
-  return 'http://localhost:8000';
+  return `http://localhost:${DEFAULT_PORT}`;
 }
 
 export const API_BASE_URL = inferBaseUrl();
 
-/** Deep link the OAuth callback bounces back to; must match FRONTEND_REDIRECT_URI. */
-export const AUTH_REDIRECT = 'aiassistant://auth';
+/** Re-exported so the API layer stays the one place a caller reaches for it. */
+export { AUTH_REDIRECT };

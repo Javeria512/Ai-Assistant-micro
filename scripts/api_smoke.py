@@ -44,7 +44,8 @@ def _plural(count: int, noun: str) -> str:
 
 
 def sum_profile(body: Dict[str, Any]) -> str:
-    return f"{body.get('display_name')} <{body.get('email')}> - {body.get('job_title') or 'no title'}"
+    title = body.get("job_title") or "no title"
+    return f"{body.get('display_name')} <{body.get('email')}> - {title}"
 
 
 def sum_collection(noun: str) -> Callable[[Dict[str, Any]], str]:
@@ -71,7 +72,8 @@ def sum_collection(noun: str) -> Callable[[Dict[str, Any]], str]:
 
 
 def sum_agenda(body: Dict[str, Any]) -> str:
-    text = f"{body.get('date')} ({body.get('timezone')}): {_plural(body.get('total_meetings', 0), 'meeting')}"
+    meetings = _plural(body.get("total_meetings", 0), "meeting")
+    text = f"{body.get('date')} ({body.get('timezone')}): {meetings}"
     text += f", {body.get('total_meeting_minutes', 0)}min"
     if body.get("conflicts"):
         text += f", {len(body['conflicts'])} conflict(s)"
@@ -151,14 +153,26 @@ CHECKS: List[Tuple[str, str, bool, Optional[Callable], Tuple[int, ...]]] = [
     ("GET", "/api/v1/calendar/events?limit=10", True, sum_collection("event"), (200,)),
     ("GET", "/api/v1/calendar/conflicts", True, sum_collection("conflict"), (200,)),
     ("GET", "/api/v1/mail/messages?limit=10", True, sum_collection("message"), (200,)),
-    ("GET", "/api/v1/mail/messages?limit=5&unread_only=true", True, sum_collection("unread"), (200,)),
+    (
+        "GET",
+        "/api/v1/mail/messages?limit=5&unread_only=true",
+        True,
+        sum_collection("unread"),
+        (200,),
+    ),
     ("GET", "/api/v1/mail/important?limit=5", True, sum_collection("email"), (200,)),
     ("GET", "/api/v1/chats?limit=10", True, sum_collection("chat"), (200,)),
     ("GET", "/api/v1/chats/important?limit=5", True, sum_collection("chat"), (200,)),
     ("GET", "/api/v1/tasks/lists", True, sum_collection("list"), (200,)),
     ("GET", "/api/v1/tasks/pending?limit=20", True, sum_collection("task"), (200,)),
     ("GET", "/api/v1/tasks/summary", True, sum_task_summary, (200,)),
-    ("GET", "/api/v1/assistant/priority-weights", True, lambda b: f"{len(b.get('effective', {}))} sources weighted", (200,)),
+    (
+        "GET",
+        "/api/v1/assistant/priority-weights",
+        True,
+        lambda b: f"{len(b.get('effective', {}))} sources weighted",
+        (200,),
+    ),
     ("GET", "/api/v1/assistant/priorities?limit=15", True, sum_priorities, (200,)),
     ("GET", "/api/v1/assistant/summary", True, sum_summary, (200,)),
     ("GET", "/api/v1/assistant/daily-brief", True, sum_brief, (200,)),

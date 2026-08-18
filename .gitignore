@@ -1,13 +1,18 @@
-# Secrets - never commit
+# ── Secrets — never commit ───────────────────────────────────────────────
 .env
+.env.*
 *.pem
 *.key
+# …but the templates the README tells people to copy from must be tracked.
+!.env.example
+# Local dev session cache written by scripts/api_smoke.py
+.dev-session.json
 
-# Local database
+# ── Local database ───────────────────────────────────────────────────────
 *.db
 *.sqlite3
 
-# Python
+# ── Python ───────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -17,22 +22,24 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Environments
+# ── Environments ─────────────────────────────────────────────────────────
 venv/
 .venv/
 env/
 
-# Editors / OS
+# ── Node / React Native ──────────────────────────────────────────────────
+node_modules/
+*.log
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/.gradle/
+mobile/android/app/.cxx/
+mobile/ios/build/
+mobile/ios/Pods/
+mobile/vendor/bundle/
+
+# ── Editors / OS ─────────────────────────────────────────────────────────
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
-
-# Local dev session cache from scripts/api_smoke.py
-.dev-session.json
-.env
-.env.*
-venv/
-__pycache__/
-node_modules/
-*.log

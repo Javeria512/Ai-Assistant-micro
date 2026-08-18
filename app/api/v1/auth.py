@@ -69,7 +69,9 @@ async def login(
     )
     if response == "json":
         return result
-    return RedirectResponse(result.authorization_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    return RedirectResponse(
+        result.authorization_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT
+    )
 
 
 @router.get(

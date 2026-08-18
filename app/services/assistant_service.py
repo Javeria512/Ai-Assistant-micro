@@ -323,7 +323,8 @@ class AssistantService(GraphService):
                 f"({hours}h)"
             )
         if stats.overdue_tasks:
-            parts.append(f"{stats.overdue_tasks} overdue task{'s' if stats.overdue_tasks != 1 else ''}")
+            suffix = "s" if stats.overdue_tasks != 1 else ""
+            parts.append(f"{stats.overdue_tasks} overdue task{suffix}")
         elif stats.tasks_due_today:
             parts.append(f"{stats.tasks_due_today} task(s) due today")
         if stats.emails_awaiting_reply:

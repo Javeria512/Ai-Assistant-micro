@@ -1,15 +1,16 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Header } from '../components/Header';
-import { TabBar } from '../components/TabBar';
-import { useApp } from '../store/AppStore';
-import { CalendarScreen } from '../screens/CalendarScreen';
-import { ChatsScreen } from '../screens/ChatsScreen';
-import { HomeScreen } from '../screens/HomeScreen';
-import { LoginScreen } from '../screens/LoginScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
-import { TasksScreen } from '../screens/TasksScreen';
+import { Header, TabBar } from '../components/layout';
+import {
+  CalendarScreen,
+  ChatsScreen,
+  HomeScreen,
+  LoginScreen,
+  ProfileScreen,
+  TasksScreen,
+} from '../screens';
+import { useApp } from '../store';
 import type { RootStackParamList, TabParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

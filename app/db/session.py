@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import AsyncGenerator, Any, Dict
+from typing import Any, AsyncGenerator, Dict
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
